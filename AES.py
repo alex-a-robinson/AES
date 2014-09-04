@@ -62,7 +62,7 @@ rcon = [
 def rotate(word, n):
 	'''Rotates a word n bytes'''
 	return word[n:]+word[0:n]
-	
+
 def shiftRows(state):
 	'''Shift bytes to the left for each row'''
 	for i in range(4):
@@ -111,15 +111,15 @@ def expandKey(cipherKey):
 		if (currentSize % cipherKeySize) == 16:
 			for i in range(4):
 				t[i] = sbox[t[i]]
-				
+		
 		# XOR t with 4 byte block [16, 24, 32] bytes before the end of the
 		# current expanded key. These become the next 4 bytes in the expaned key
 		for i in range(4):
 			expandedKey.append(((expandedKey[currentSize - cipherKeySize]) ^ (t[i])))
 			currentSize += 1
-		
-	return expandedKey
 	
+	return expandedKey
+
 def subBytes(state):
 	'''sbox transform on each value in state table'''
 	for i in range(len(state)):
@@ -129,7 +129,7 @@ def subBytesInv(state):
 	'''Inverse of subBytes - uses sboxInv'''
 	for i in range(len(state)):
 		state[i] = sboxInv[state[i]]
-	
+
 def addRoundKey(state, roundKey):
 	'''XOR each byte of roundKey with the state table'''
 	for i in range(len(state)):
@@ -149,7 +149,7 @@ def galoisMult(a, b):
 			a ^= 0x1b
 		b >>= 1
 	return p % 256
-	
+
 def mixColumn(column):
 	'''Performs rijndael mix columns operation
 	https://en.wikipedia.org/wiki/Rijndael_mix_columns'''
@@ -188,7 +188,7 @@ def mixColumns(state):
 		# Transfere the elements back into the state table
 		for j in range(4):
 			state[j*4+i] = column[j]
-			
+
 def mixColumnsInv(state):
 	'''Inverse of mixColumns'''
 	for i in range(4):
@@ -217,7 +217,7 @@ def aesRoundInv(state, roundKey):
 	mixColumnsInv(state)
 	shiftRowsInv(state)
 	subBytesInv(state)
-	
+
 def createRoundKey(expandedKey, n):
 	'''Returns a 16 byte round key based on an expanded key and round number'''
 	return expandedKey[(n*16):(n*16+16)]
@@ -228,7 +228,7 @@ def passwordToKey(password):
 	sha256.update(password)
 	key = []
 	for c in list(sha256.digest()):
-		key.append(c) # ord?
+		key.append(ord(c)) # ord?
 	return key
 
 def aesMain(state, expandedKey, numRounds=14):
@@ -244,7 +244,7 @@ def aesMain(state, expandedKey, numRounds=14):
 	subBytes(state)
 	shiftRows(state)
 	addRoundKey(state, roundKey)
-	
+
 def aesMainInv(state, expanedKey, numRounds=14):
 	'''Inverse of aesMain'''
 	# Create round key from last as in reverse
@@ -258,7 +258,7 @@ def aesMainInv(state, expanedKey, numRounds=14):
 	# In final round mixColumns is skiped
 	roundKey = createRoundKey(expandedKey, 0)
 	addRoundKey(state, roundKey)
-	
+
 def aesEncrypt(plaintext, key):
 	'''Encrypts a single block of plaintext'''
 	block = copy(plaintext)
@@ -272,7 +272,7 @@ def aesDecrypt(ciphertext, key):
 	expandedKey = expandKey(key)
 	aesMainInv(block, expandedKey)
 	return block
-	
+
 def getBlocks(text): #TODO: for File input only?
 	'''Returns a 16 byte block from text'''
 	blocks = []
@@ -286,8 +286,27 @@ def getBlocks(text): #TODO: for File input only?
 		blocks.append(block)
 	return blocks
 
+def getBlock(fp):
+	raw = fp.read(16)
+	# reached end of file
+	if len(raw) == 0:
+		return ""
+	# container for list of bytes
+	block = []
+	for c in list(raw):
+		block.append(ord(c)) #TODO: ord?
+		# if the block is less than 16 bytes, pad the block
+		# with the string representing the number of missing bytes
+	if len(block) < 16:
+		padChar = 16-len(block)
+		while len(block) < 16:
+			block.append(padChar)
+	return block
+
+
+'''
 def encrypt(text, password):
-	'''Encrypts text of arbitray length'''
+	\'''Encrypts text of arbitray length\'''
 	outFile = open('out.aes', 'w')
 	block = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 	ciphertext = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
@@ -319,43 +338,86 @@ def encrypt(text, password):
 		
 		for c in ciphertext:
 			outFile.write(chr(c))
-
+	
 	if (textByteSize % 16) == 0:
 		outFile.write(16*chr(16))
 	outFile.close()
+'''
 
-def gb(fp):
-	raw = fp.read(16)
-	    # reached end of file
-	if len(raw) == 0:
-		return ""
-	    # container for list of bytes
-	block = []
-	for c in list(raw):
-		block.append(c) #TODO: ord?
-	    # if the block is less than 16 bytes, pad the block
-	    # with the string representing the number of missing bytes
-	if len(block) < 16:
-		padChar = 16-len(block)
-		while len(block) < 16:
-			block.append(padChar)
-	return block
+def encrypt(myInput, password, outputfile=None):
+	block = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0] # plaintext
+	ciphertext = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0] # ciphertext
+    # Initialization Vector
+	IV = []
+	for i in range(16):
+		IV.append(randint(0, 255))
+    
+    # convert password to AES 256-bit key
+	aesKey = passwordToKey(password)
+    
+    # create handle for file to be encrypted
+	fp = open(myInput, "rb")
+    
+    # create handle for encrypted output file
+	outfile = open(outputfile,"w")
+    
+    # write IV to outfile
+	for byte in IV:
+		outfile.write(chr(byte))
+    
+    # get the file size (bytes)
+    # if the file size is a multiple of the block size, we'll need
+    # to add a block of padding at the end of the message
+	fp.seek(0,2)
+	filesize = fp.tell()
+    # put the file pointer back at the beginning of the file
+	fp.seek(0)
+    
+    # begin reading in blocks of input to encrypt
+	firstRound = True
+	block = getBlock(fp)
+	while block != "":
+		if firstRound:
+			blockKey = aesEncrypt(IV, aesKey)
+			firstRound = False
+		else:
+			blockKey = aesEncrypt(blockKey, aesKey)
+        
+		for i in range(16):
+			ciphertext[i] = block[i] ^ blockKey[i]
+        
+        # write ciphertext to outfile
+		for c in ciphertext:
+			outfile.write(chr(c))
+        
+        # grab next block from input file
+		block = getBlock(fp)
+    # if the message ends on a block boundary, we need to add an
+    # extra block of padding
+	if filesize % 16 == 0:
+		outfile.write(16*chr(16))
+    # close file pointers
+	fp.close()
+	outfile.close()
 
 def decrypt(password):
 	inFile = open('out.aes', 'rb')
 	block = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 	plaintext = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-
+	
+	message = ""
+	
 	aesKey = passwordToKey(password)
-
-	IV = gb(inFile)
+	
+	IV = getBlock(inFile)
+	print([hex(n) for n in IV])
 	inFile.seek(0, 2)
 	fileSize = inFile.tell()
 	inFile.seek(16)
 	
 	# Encrpt each block
 	firstRound = True
-	block = gb(inFile)
+	block = getBlock(inFile)
 	while block != "":
 		if firstRound:
 			blockKey = aesEncrypt(IV, aesKey)
@@ -369,17 +431,15 @@ def decrypt(password):
 		if inFile.tell() == fileSize:
 			plaintext = plaintext[0:-(plaintext[-1])]
 		
-		for c in plaintext:
-			print(chr(c))
+		block = getBlock(inFile)
 		
-		block = gb(inFile)
-
+		message += "".join([chr(c) for c in plaintext])
+	
 	inFile.close()
-	print(plaintext)
+	print(message)
 
-text = "The quick brown fox jumped over the lazy dog.".encode("utf-8")
-password ="super secrete password".encode("utf-8") 
-encrypt(text, password)
+password ="a"
+encrypt('input.txt', password, 'out.aes')
 decrypt(password)
 	
 	
