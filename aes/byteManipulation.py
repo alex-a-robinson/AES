@@ -433,14 +433,15 @@ def getBlocks(text): #TODO: for File input only?
 		List of 16 byte blocks
 	"""
 	blocks = []
-	for i in range(0, len(text), 16): #TODO: check not -15
+	for i in range(0, len(text) - 16, 16): #TODO: check not -15
 		print(i)
 		block = text[i:i+16]
 		if len(block) < 16:
-			padChar = bytes([16 - len(block)])
+			padChar = str([16 - len(block)])
 			while len(block) < 16:
 				block += padChar
-		blocks.append(block)
+		
+		blocks.append([ord(c) for c in block])
 	return blocks
 
 def getBlock(fp):
